@@ -187,7 +187,7 @@ sub setup_installer {
         if (-e $file) {
             $self->zilla->log("Override $filename in root from [ReadmeAnyFromPod]");
         }
-        File::Slurp::write_file("$file", $content);
+        File::Slurp::write_file("$file", {binmode => ':raw'}, $content);
     }
     else {
         die "Unknown location specified";
