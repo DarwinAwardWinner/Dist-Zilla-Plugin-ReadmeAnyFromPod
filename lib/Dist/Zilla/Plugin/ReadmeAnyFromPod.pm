@@ -11,10 +11,9 @@ use Moose::Util::TypeConstraints qw(enum);
 use IO::Handle;
 use Encode qw( encode );
 
-# This cannot be the FileGatherer role, because it needs to be called
-# after file munging to get the fully-munged POD.
-with 'Dist::Zilla::Role::InstallTool';
-with 'Dist::Zilla::Role::FilePruner';
+with 'Dist::Zilla::Role::FileGatherer';
+with 'Dist::Zilla::Role::FileMunger';
+with 'Dist::Zilla::Role::AfterBuild';
 
 our $_types = {
     text => {
@@ -148,64 +147,98 @@ has location => (
     default => sub { $_[0]->__from_name()->[1] || 'build' },
 );
 
-=method prune_files
+=method gather_files
 
-Files with C<location = root> must also be pruned, so that they don't
-sneak into the I<next> build by virtue of already existing in the root
-dir.
-
-=cut
-
-sub prune_files {
-  my ($self) = @_;
-  if ($self->location eq 'root') {
-      for my $file ($self->zilla->files->flatten) {
-          next unless $file->name eq $self->filename;
-          $self->log_debug([ 'pruning %s', $file->name ]);
-          $self->zilla->prune_file($file);
-      }
-  }
-  return;
-}
-
-=method setup_installer
-
-Adds the requested README file to the dist.
+We create the file early, so other plugins that need to have the full list of
+files are aware of what we will be generating.
 
 =cut
 
-sub setup_installer {
+sub gather_files {
     my ($self) = @_;
 
-    require Dist::Zilla::File::InMemory;
-
-    my $content = $self->get_readme_content();
-
     my $filename = $self->filename;
-    my $file = $self->zilla->files->grep( sub { $_->name eq $filename } )->head;
+    if ( $self->location eq 'build'
+         # allow for the file to also exist in the dist
+         and not @{$self->zilla->files->grep( sub { $_->name eq $filename })}
+       ) {
+        require Dist::Zilla::File::InMemory;
+        my $file = Dist::Zilla::File::InMemory->new({
+            content => 'this will be overwritten',
+            name    => $self->filename,
+        });
+
+        $self->add_file($file);
+    }
+    return;
+}
+
+=method munge_files
+
+=cut
+
+sub munge_files {
+    my $self = shift;
 
     if ( $self->location eq 'build' ) {
-        if ( $file ) {
-            $file->content( $content );
-            $self->log("Override $filename in build");
-        } else {
-            $file = Dist::Zilla::File::InMemory->new({
-                content => $content,
-                name    => $filename,
-            });
-            $self->add_file($file);
-        }
+        my $filename = $self->filename;
+        my $file = $self->zilla->files->grep( sub { $_->name eq $filename } )->head;
+        $self->munge_file($file);
     }
-    elsif ( $self->location eq 'root' ) {
+    return;
+}
+
+=method munge_file
+
+Edits the content into the requested README file in the dist.
+
+=cut
+
+sub munge_file {
+    my ($self, $file) = @_;
+
+    $self->log_debug([ 'ReadmeAnyFromPod updating contents of %s in dist', $file->name ]);
+
+    my $content = $self->get_readme_content();
+    my $filename = $self->filename;
+
+    if ( $file ) {
+        $file->content( $content );
+        $self->log("Override $filename in build");
+    } else {
+        $file = Dist::Zilla::File::InMemory->new({
+            content => $content,
+            name    => $filename,
+        });
+        $self->add_file($file);
+    }
+
+    return;
+}
+
+=method after_build
+
+Create the requested README file in the root.
+
+=cut
+
+sub after_build {
+    my $self = shift;
+
+    if ( $self->location eq 'root' ) {
+        my $filename = $self->filename;
+        $self->log_debug([ 'ReadmeAnyFromPod updating contents of %s in root', $filename ]);
+
+        my $content = $self->get_readme_content();
+
         require File::Slurp;
         my $file = $self->zilla->root->file($filename);
         if (-e $file) {
-            $self->log("Override $filename in root");
+            $self->log("overriding $filename in root");
         }
-        File::Slurp::write_file("$file", {binmode => ':raw'}, $content);
-    }
-    else {
-        die "Unknown location specified";
+        # :raw for avoiding \n -> \r\n on win32
+        # :utf8 because content we read from pod contains wide characters
+        File::Slurp::write_file("$file", {binmode => ':raw:utf8'}, $content);
     }
 
     return;
@@ -216,7 +249,7 @@ sub _file_from_filename {
     for my $file ($self->zilla->files->flatten) {
         return $file if $file->name eq $filename;
     }
-    return; # let moose throw exception if nothing found
+    die 'no README found (place [ReadmeAnyFromPod] below [Readme] in dist.ini)!';
 }
 
 =method get_readme_content

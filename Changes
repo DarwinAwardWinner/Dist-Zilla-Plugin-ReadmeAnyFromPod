@@ -1,6 +1,10 @@
 Revision history for Dist-Zilla-Plugin-ReadmeAnyFromPod
 
 {{$NEXT}}
+    - now using FileGatherer, FileMunger and AfterBuild phases rather than
+      InstallerTool
+    - write out root file using :utf8 layer to ensure proper content encoding
+      (Karen Etheridge)
 
 0.131500  2013-05-30 02:03:44 America/Los_Angeles
     - Allow source POD to come fro somewhere other than the main
