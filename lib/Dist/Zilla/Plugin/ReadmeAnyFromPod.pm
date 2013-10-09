@@ -138,13 +138,17 @@ This puts the README in the root directory (the same directory that
 contains F<dist.ini>). The README will not be incorporated into the
 built dist.
 
+=item both
+
+This puts the README file in both root and build.
+
 =back
 
 =cut
 
 has location => (
     ro, lazy,
-    isa => enum([qw(build root)]),
+    isa => enum([qw(build root both)]),
     default => sub { $_[0]->__from_name()->[1] || 'build' },
 );
 
@@ -183,8 +187,10 @@ sub setup_installer {
 
     my $filename = $self->filename;
     my $file = $self->zilla->files->grep( sub { $_->name eq $filename } )->head;
+    my $method_found = 0;
 
-    if ( $self->location eq 'build' ) {
+    if ( $self->location eq 'build' || $self->location eq 'both' ) {
+        $method_found=1;
         if ( $file ) {
             $file->content( $content );
             $self->log("Override $filename in build");
@@ -196,7 +202,8 @@ sub setup_installer {
             $self->add_file($file);
         }
     }
-    elsif ( $self->location eq 'root' ) {
+    if ( $self->location eq 'root' || $self->location eq 'both') {
+        $method_found=1;
         require File::Slurp;
         my $file = $self->zilla->root->file($filename);
         if (-e $file) {
@@ -204,7 +211,7 @@ sub setup_installer {
         }
         File::Slurp::write_file("$file", {binmode => ':raw'}, $content);
     }
-    else {
+    if ( !$method_found ){
         die "Unknown location specified";
     }
 
