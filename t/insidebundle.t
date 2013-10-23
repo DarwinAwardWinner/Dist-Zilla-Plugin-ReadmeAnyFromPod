@@ -51,7 +51,7 @@ my $tzil = Builder->from_config(
 );
 
 lives_ok { $tzil->build; } "Built dist successfully"
-    or skip "Building dist failed", scalar(@possible_types) * scalar(@possible_locations);
+    or die "Building dist failed";
 
 my @expected_readme_files;
 for my $type (@possible_types) {
