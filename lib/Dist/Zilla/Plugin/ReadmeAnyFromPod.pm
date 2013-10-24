@@ -15,10 +15,10 @@ use PPI::Document;
 use PPI::Token::Pod;
 use Scalar::Util 'blessed';
 
-with 'Dist::Zilla::Role::AfterBuild' => { -version => 5 };
-with 'Dist::Zilla::Role::FileGatherer' => { -version => 5 };
-with 'Dist::Zilla::Role::FileMunger' => { -version => 5 };
-with 'Dist::Zilla::Role::FilePruner' => { -version => 5 };
+with 'Dist::Zilla::Role::AfterBuild';
+with 'Dist::Zilla::Role::FileGatherer';
+with 'Dist::Zilla::Role::FileMunger';
+with 'Dist::Zilla::Role::FilePruner';
 
 # TODO: Should these be separate modules?
 our $_types = {
@@ -262,9 +262,12 @@ sub after_build {
         if (-e $file) {
             $self->log("overriding $filename in root");
         }
-        my $encoded_content = encode($self->_get_source_encoding(),
-                                     $content);
-        Path::Tiny::path($file)->spew_raw($encoded_content);
+        my $encoding = $self->_get_source_encoding();
+        Path::Tiny::path($file)->spew_raw(
+            $encoding eq 'raw'
+                ? $content
+                : encode($encoding, $content)
+        );
     }
 
     return;
@@ -313,7 +316,10 @@ sub _get_source_pod {
 
 sub _get_source_encoding {
     my ($self) = shift;
-    $self->_source_file->encoding;
+    return
+        $self->_source_file->can('encoding')
+            ? $self->_source_file->encoding
+            : 'raw';        # Dist::Zilla pre-5.0
 }
 
 =method get_readme_content
