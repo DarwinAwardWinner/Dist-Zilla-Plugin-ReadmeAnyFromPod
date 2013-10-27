@@ -51,6 +51,18 @@ MODULE
         supersetof('[ReadmeAnyFromPod] someone tried to munge lib/Foo.pm after we read from it. Making modifications again...'),
         '...but includes a useful warning about plugin ordering',
     );
+
+    my $build_dir = $tzil->tempdir->subdir('build');
+
+    my $dist_file = path($build_dir, "README.md");
+    ok(-e $dist_file, "README.md created in dist");
+
+    my $content = $dist_file->slurp_utf8;
+    like($content, qr/=head1 NAME/, 'contains headers added by PodWeaver');
+
+    my $pm_content = path($build_dir, 'lib/Foo.pm')->slurp_utf8;
+
+    like($pm_content, qr/=head1 NAME/, 'PodWeaver added a NAME header to document');
 }
 
 {
@@ -81,10 +93,9 @@ MODULE
     ok(-e $dist_file, "README.md created in dist");
 
     my $content = $dist_file->slurp_utf8;
-#print "### content of README is -- $content -- \n";
+    like($content, qr/=head1 NAME/, 'contains headers added by PodWeaver');
 
     my $pm_content = path($build_dir, 'lib/Foo.pm')->slurp_utf8;
-#print "### content of .pm is -- $pm_content -- \n";
 
     like($pm_content, qr/=head1 NAME/, 'PodWeaver added a NAME header to document');
 }

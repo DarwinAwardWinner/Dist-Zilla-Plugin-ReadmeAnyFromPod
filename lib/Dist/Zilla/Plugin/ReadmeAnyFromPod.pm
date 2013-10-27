@@ -230,7 +230,7 @@ sub munge_file {
             if ($newcontent ne $plugin->_last_source_content)
             {
                 $plugin->log('someone tried to munge ' . $source_file->name . ' after we read from it. Making modifications again...');
-                $plugin->munge_file($self);
+                $plugin->munge_file($file);
             }
         });
 
