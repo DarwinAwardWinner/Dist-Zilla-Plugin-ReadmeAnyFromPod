@@ -8,6 +8,7 @@ use autodie;
 use Test::DZil;
 
 use Dist::Zilla::Plugin::ReadmeAnyFromPod;
+use Pod::Markdown;
 
 # Pull out types from the plugin to get default filenames
 
@@ -49,7 +50,10 @@ my %tests = (
     ],
     markdown => [
         [ qr/^# SYNOPSIS\s*$/m, "Markdown header" ],
-        [ qr/__[^\s_]+__/, "Markdown bold formatting" ],
+        [
+            (Pod::Markdown->VERSION >= '2.001' ? qr/\*\*[^\s_]+\*\*/ : qr/__[^\s_]+__/),
+            "Markdown bold formatting"
+        ],
         [ qr/(?<!_)_[^\s_]+_(?!_)/, "Markdown italic formatting" ],
     ],
     never => [
