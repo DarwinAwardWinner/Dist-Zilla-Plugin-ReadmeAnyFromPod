@@ -6,7 +6,6 @@ package Dist::Zilla::Plugin::ReadmeAnyFromPod;
 
 use Encode qw( encode );
 use IO::Handle;
-use List::Util qw( reduce );
 use Moose::Autobox;
 use Moose::Util::TypeConstraints qw(enum);
 use Moose;
@@ -19,6 +18,7 @@ with 'Dist::Zilla::Role::AfterRelease';
 with 'Dist::Zilla::Role::FileGatherer';
 with 'Dist::Zilla::Role::FileMunger';
 with 'Dist::Zilla::Role::FilePruner';
+with 'Dist::Zilla::Role::MainPodReader';
 
 # TODO: Should these be separate modules?
 our $_types = {
@@ -104,16 +104,12 @@ has filename => (
 
 =attr source_filename
 
-The file from which to extract POD for the content of the README.
-The default is the file of the main module of the dist.
+The file from which to extract POD for the content of the README. The
+default is the file of the main module of the dist. If there is a pod
+file with the same basename as the main module, that is used as the
+default instead.
 
 =cut
-
-has source_filename => (
-    ro, lazy,
-    isa => 'Str',
-    default => sub { shift->zilla->main_module->name; },
-);
 
 =attr location
 
@@ -177,7 +173,7 @@ has phase => (
     default => 'build',
 );
 
-=for Pod::Coverage BUILD
+=for Pod::Coverage BUILD mvp_aliases
 
 =cut
 
@@ -191,6 +187,11 @@ sub BUILD {
         if $self->location eq 'build' and $self->type eq 'pod';
 }
 
+sub mvp_aliases {
+    {
+        source_filename => 'source_file',
+    }
+}
 =method gather_files
 
 We create the file early, so other plugins that need to have the full list of
@@ -276,32 +277,30 @@ Edits the content into the requested README file in the dist.
 sub munge_file {
     my ($self, $file) = @_;
 
-    # Ensure that we repeat the munging if the source file is modified
-    # after we run.
-    my $source_file = $self->_source_file();
-    if (not $source_file->does('Dist::Zilla::Role::File::ChangeNotification'))
-    {
-        require Dist::Zilla::Role::File::ChangeNotification;
-        Dist::Zilla::Role::File::ChangeNotification->meta->apply($source_file);
-        my $plugin = $self;
-        $source_file->on_changed(sub {
-            my ($self, $newcontent) = @_;
-
-            # If the new content is actually different, recalculate
-            # the content based on the updates.
-            if ($newcontent ne $plugin->_last_source_content)
-            {
-                $plugin->log('someone tried to munge ' . $source_file->name . ' after we read from it. Making modifications again...');
-                $plugin->munge_file($file);
-            }
-        });
-
-        $source_file->watch_file;
-    }
+    # This check can't be put in the BUILD method because it has to
+    # happen *after* the file gathering step.
+    # TODO add a test for this
+    # This could happen for type=pod if the source file is a pod file.
+    $self->log_fatal('Source and destination file are the same')
+      if $self->source_file eq $file;
 
     $self->log_debug([ 'ReadmeAnyFromPod updating contents of %s in dist', $file->name ]);
     $file->content($self->get_readme_content);
     return;
+}
+
+=method on_source_file_update
+
+This method is called if the source file is modified after we create
+the README file in the dist. It updates the README content to match
+the new content of the source file, and emits a warning.
+
+=cut
+
+sub on_source_file_update {
+    my $self = shift;
+    $self->log('someone tried to munge ' . $self->source_file . ' after we read from it. Making modifications again...');
+    $self->munge_files();
 }
 
 =method after_build
@@ -339,7 +338,7 @@ sub _create_readme {
         if (-e $file) {
             $self->log("overriding $filename in root");
         }
-        my $encoding = $self->_get_source_encoding();
+        my $encoding = $self->source_encoding();
         Path::Tiny::path($file)->spew_raw(
             $encoding eq 'raw'
                 ? $content
@@ -350,57 +349,6 @@ sub _create_readme {
     return;
 }
 
-sub _file_from_filename {
-    my ($self, $filename) = @_;
-    for my $file ($self->zilla->files->flatten) {
-        return $file if $file->name eq $filename;
-    }
-    die 'no README found (place [ReadmeAnyFromPod] below [Readme] in dist.ini)!';
-}
-
-sub _source_file {
-    my ($self) = shift;
-    $self->_file_from_filename($self->source_filename);
-}
-
-# Holds the contents of the source file as of the last time we
-# generated a readme from it. We use this to detect when the source
-# file is modified so we can update the README file again.
-has _last_source_content => (
-    is => 'rw', isa => 'Str',
-    default => '',
-);
-
-sub _get_source_content {
-    my ($self) = shift;
-    $self->_last_source_content($self->_source_file->content);
-}
-
-sub _get_source_pod {
-    my ($self) = shift;
-    my $source_content = $self->_get_source_content();
-
-    require PPI::Document;
-
-    my $doc = PPI::Document->new(\$source_content);
-    my $pod_elems = $doc->find('PPI::Token::Pod');
-    my $pod_content = "";
-    if ($pod_elems) {
-        # Concatenation should stringify it
-        $pod_content .= PPI::Token::Pod->merge(@$pod_elems);
-    }
-
-    return $pod_content;
-}
-
-sub _get_source_encoding {
-    my ($self) = shift;
-    return
-        $self->_source_file->can('encoding')
-            ? $self->_source_file->encoding
-            : 'raw';        # Dist::Zilla pre-5.0
-}
-
 =method get_readme_content
 
 Get the content of the README in the desired format.
@@ -409,7 +357,7 @@ Get the content of the README in the desired format.
 
 sub get_readme_content {
     my ($self) = shift;
-    my $source_pod = $self->_get_source_pod();
+    my $source_pod = $self->pod_for_source_file();
     my $parser = $_types->{$self->type}->{parser};
     # Save the POD text used to generate the README.
     return $parser->($source_pod);
