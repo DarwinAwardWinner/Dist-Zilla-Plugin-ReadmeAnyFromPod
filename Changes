@@ -1,6 +1,8 @@
 Revision history for Dist-Zilla-Plugin-ReadmeAnyFromPod
 
 {{$NEXT}}
+    - do not decode the already-decoded strings from PPI, now that
+      Dist::Zilla::Role::PPI is fixed (in 6.003)
 
 0.161150  2016-04-24 10:10:10-07:00 America/Los_Angeles
     - Update for Dist::Zilla v6 compatibility.

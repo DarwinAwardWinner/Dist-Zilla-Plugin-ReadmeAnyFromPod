@@ -379,7 +379,10 @@ sub _get_source_pod {
         $pod_content .= PPI::Token::Pod->merge(@$pod_elems);
     }
 
-    if ((my $encoding = $self->_get_source_encoding) ne 'raw') {
+    if ((my $encoding = $self->_get_source_encoding) ne 'raw'
+            and not eval { Dist::Zilla::Role::PPI->VERSION('6.003') }
+    ) {
+        # older Dist::Zilla::Role::PPI passes encoded content to PPI
         require Encode;
         $pod_content = Encode::decode($encoding, $pod_content);
     }
