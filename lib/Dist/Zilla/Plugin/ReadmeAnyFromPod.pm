@@ -57,7 +57,7 @@ our $_types = {
         },
     },
     github_markdown => {
-        filename => 'README.mkdn',
+        filename => 'README.md',
         parser => sub {
             my $pod = $_[0];
 
