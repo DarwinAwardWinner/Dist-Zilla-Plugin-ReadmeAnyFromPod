@@ -56,6 +56,20 @@ our $_types = {
             return $content;
         },
     },
+    github_markdown => {
+        filename => 'README.mkdn',
+        parser => sub {
+            my $pod = $_[0];
+
+            require Pod::Markdown::Github;
+            Pod::Markdown->VERSION('0.01');
+            my $parser = Pod::Markdown::Github->new();
+            $parser->output_string( \my $content );
+            $parser->parse_characters(1);
+            $parser->parse_string_document($pod);
+            return $content;
+        },
+    },
     html => {
         filename => 'README.html',
         parser => sub {
