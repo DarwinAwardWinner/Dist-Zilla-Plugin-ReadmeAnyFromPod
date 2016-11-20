@@ -52,6 +52,11 @@ my %tests = (
         [ qr/([_*]{2})[^\s_*]+\1/, "Markdown bold formatting" ],
         [ qr/(?<!_)_[^\s_]+_(?!_)|(?<!\*)\*[^\s*]+\*(?!\*)/, "Markdown italic formatting" ],
     ],
+    gfm => [
+        [ qr/^# SYNOPSIS\s*$/m, "Markdown header" ],
+        [ qr/([_*]{2})[^\s_*]+\1/, "Markdown bold formatting" ],
+        [ qr/(?<!_)_[^\s_]+_(?!_)|(?<!\*)\*[^\s*]+\*(?!\*)/, "Markdown italic formatting" ],
+    ],
     never => [
         [ qr/\r/, "Carriage return", ],
         [ qr/^__END__$/m, "Perl code __END__ marker", ],
@@ -59,8 +64,6 @@ my %tests = (
 );
 
 my @possible_types = keys %$Dist::Zilla::Plugin::ReadmeAnyFromPod::_types;
-
-my $expected_number_of_tests = scalar(@possible_types) * (2 + scalar(map { @$_ } values %tests)) * 2;
 
 for my $tested_type (@possible_types) {
     my @other_types = grep { $_ ne $tested_type } keys %tests;
@@ -83,7 +86,9 @@ for my $tested_type (@possible_types) {
     } keys %config;
 
     my @positive_tests = $tests{$tested_type} ? @{$tests{$tested_type}} : ();
+    my @positive_test_names = map { $_->[1] } @positive_tests;
     my @negative_tests = map { $tests{$_} ? @{$tests{$_}} : () } @other_types;
+    @negative_tests = grep { my $item = $_; not grep { $item->[1] eq $_ } @positive_test_names } @negative_tests;
 
     for my $tzil_name (keys %tzil) {
       SKIP: {
@@ -109,4 +114,4 @@ for my $tested_type (@possible_types) {
     }
 }
 
-done_testing($expected_number_of_tests);
+done_testing();
