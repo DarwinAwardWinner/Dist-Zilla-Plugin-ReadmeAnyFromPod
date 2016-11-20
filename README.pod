@@ -6,7 +6,7 @@ Dist::Zilla::Plugin::ReadmeAnyFromPod - Automatically convert POD to a README in
 
 =head1 VERSION
 
-version 0.161170
+version 0.163250
 
 =head1 SYNOPSIS
 
@@ -54,9 +54,10 @@ build still works, but is less efficient).
 =head2 type
 
 The file format for the readme. Supported types are "text",
-"markdown", "pod", and "html".  Note that you are not advised to
-create a F<.pod> file in the dist itself, as L<ExtUtils::MakeMaker>
-will install that, both into C<PERL5LIB> and C<MAN3DIR>.
+"markdown", "gfm" (Github-flavored markdown), "pod", and "html". Note
+that you are not advised to create a F<.pod> file in the dist itself,
+as L<ExtUtils::MakeMaker> will install that, both into C<PERL5LIB> and
+C<MAN3DIR>.
 
 =head2 filename
 
