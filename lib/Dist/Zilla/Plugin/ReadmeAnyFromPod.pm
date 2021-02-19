@@ -348,7 +348,7 @@ sub _create_readme {
 
         my $destination_file = path($self->zilla->root)->child($filename);
         if (-e $destination_file) {
-            $self->log("overriding $filename in root");
+            $self->log("overwriting $filename in root");
         }
         my $encoding = $self->_get_source_encoding();
         $destination_file->spew_raw(
